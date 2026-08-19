@@ -28,6 +28,7 @@ class Credentials(BaseModel):
 class ChatRequest(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
     document_id: int | None = None
+    page_number: int | None = Field(default=None, ge=1)
     conversation_id: int | None = None
 
 @app.on_event("startup")
@@ -127,7 +128,12 @@ async def chat(data: ChatRequest, user: User = Depends(current_user), db: Sessio
         document = db.scalar(select(Document).where(Document.id == data.document_id, Document.user_id == user.id))
         if not document:
             raise HTTPException(404, "Document not found")
-        pages = db.scalars(select(DocumentPage).where(DocumentPage.document_id == document.id).order_by(DocumentPage.page_number)).all()
+        page_query = select(DocumentPage).where(DocumentPage.document_id == document.id)
+        if data.page_number is not None:
+            page_query = page_query.where(DocumentPage.page_number == data.page_number)
+        pages = db.scalars(page_query.order_by(DocumentPage.page_number)).all()
+        if data.page_number is not None and not pages:
+            raise HTTPException(404, "Document page not found")
         context = "\n\n".join(f"[Page {item.page_number}] {item.text}" for item in pages)[:30000]
     conversation = db.scalar(select(Conversation).where(Conversation.id == data.conversation_id, Conversation.user_id == user.id)) if data.conversation_id else None
     if not conversation:
@@ -136,7 +142,8 @@ async def chat(data: ChatRequest, user: User = Depends(current_user), db: Sessio
         db.flush()
     db.add(Message(conversation_id=conversation.id, role="user", content=data.content))
     if settings.openrouter_keys:
-        system = f"Use only the supplied document material. If insufficient, say so.\n\n{context}"
+        scope = f"page {data.page_number}" if data.page_number is not None else "document"
+        system = f"Use only the supplied {scope} material. If insufficient, say so. Never add facts outside the supplied material.\n\n{context}"
         provider_errors: list[str] = []
         async with httpx.AsyncClient(timeout=45) as client:
             provider = None
