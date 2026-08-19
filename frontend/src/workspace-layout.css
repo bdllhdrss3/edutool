@@ -774,7 +774,7 @@ header {
   .shell main,
   .shell.nav-collapsed main {
     width: 100%;
-    margin-left: 0;
+    margin-left: 0 !important;
   }
 
   .sidebar,

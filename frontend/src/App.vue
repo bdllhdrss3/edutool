@@ -36,13 +36,7 @@ function speak() { if(reading.value){speechSynthesis.cancel();reading.value=fals
 function selectPage(nextPage:number){page.value=nextPage;resetPageTools()}
 function move(by:number){if(document.value)selectPage(Math.min(document.value.page_count,Math.max(1,page.value+by)))}
 function changeZoom(by:number) { pdfZoom.value=Math.min(160,Math.max(75,pdfZoom.value+by)) }
-function applyNavigationWidth(width:number) {
-  const main=globalThis.document.querySelector<HTMLElement>('.shell > main')
-  if (!main) return
-  main.style.setProperty('width',`calc(100vw - ${width}px)`,'important')
-  main.style.setProperty('transform',`translateX(${width-242}px)`,'important')
-}
-async function toggleNavigation() { navCollapsed.value=!navCollapsed.value; if(navCollapsed.value) toolsOpen.value=true; await nextTick(); applyNavigationWidth(navCollapsed.value?76:Number.parseFloat(getComputedStyle(globalThis.document.documentElement).getPropertyValue('--nav-width'))) }
+function toggleNavigation() { navCollapsed.value=!navCollapsed.value; if(navCollapsed.value) toolsOpen.value=true }
 async function showSearch() { searchOpen.value=true; await nextTick(); searchInput.value?.focus() }
 function closeSearch() { searchOpen.value=false; searchQuery.value='' }
 async function openSearchDocument(id:number) { await openDocument(id); closeSearch() }
@@ -60,7 +54,7 @@ function resizePane(pane:'nav'|'tools', event:PointerEvent) {
     const delta = pane === 'nav' ? moveEvent.clientX-startX : startX-moveEvent.clientX
     const width=Math.min(maximum,Math.max(minimum,current+delta))
     if(pane==='tools') toolsWidth.value=width
-    else { root.style.setProperty(property, `${width}px`); applyNavigationWidth(width) }
+    else root.style.setProperty(property, `${width}px`)
   }
   const stopPointer = () => { removeEventListener('pointermove',movePointer); removeEventListener('pointerup',stopPointer) }
   addEventListener('pointermove',movePointer)
@@ -71,7 +65,7 @@ function resizePaneByKey(pane:'nav'|'tools', direction:number) {
   const current=pane==='tools' ? toolsWidth.value : Number.parseFloat(getComputedStyle(root).getPropertyValue(property))
   const width=Math.min(pane==='nav'?360:600,Math.max(pane==='nav'?190:300,current+direction*16))
   if(pane==='tools') toolsWidth.value=width
-  else { root.style.setProperty(property,`${width}px`); applyNavigationWidth(width) }
+  else root.style.setProperty(property,`${width}px`)
 }
 function dismissError() { errorToast.value=''; if(errorToastTimer) clearTimeout(errorToastTimer) }
 watch(error, value => {
