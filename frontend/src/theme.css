@@ -1,0 +1,208 @@
+/* ============================================================
+   edutool theme — Flat Design system (teal + orange accent)
+   Source: ui-ux-pro-max design-system recommendation
+   Loaded last so it cohesively refines the base + reader layers.
+   ============================================================ */
+:root {
+  --color-primary: #0d9488;
+  --color-primary-hover: #0b7f75;
+  --color-secondary: #14b8a6;
+  --color-accent: #ea580c;
+  --color-accent-hover: #c2470b;
+  --color-bg: #f0fdfa;
+  --color-fg: #134e4a;
+  --color-card: #ffffff;
+  --color-muted: #e8f1f4;
+  --color-muted-fg: #475569;
+  --color-border: #cfe7e2;
+  --color-destructive: #dc2626;
+  --color-ring: #0d9488;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+
+  --tr: 180ms cubic-bezier(.22, .61, .36, 1);
+  --shadow-sm: 0 1px 2px #13343a12;
+  --shadow: 0 8px 24px -14px #13343a2e;
+
+  --font-ui: "Roboto", system-ui, sans-serif;
+  --font-display: "Roboto", system-ui, sans-serif;
+
+  font-family: var(--font-ui);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.title h1,
+.head h2,
+.brand,
+.auth-brand,
+.auth-box h1,
+.empty-library h1,
+.tool-identity h2,
+.pdf article h2 {
+  font-family: var(--font-display);
+}
+
+/* ---- Accessibility: visible keyboard focus everywhere ---- */
+:where(button, a, input, textarea, select, label.button, label.upload-button):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Buttons ---- */
+.button {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: background var(--tr), color var(--tr), border-color var(--tr),
+    transform var(--tr), box-shadow var(--tr);
+}
+
+.button.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.button.secondary {
+  background: var(--color-card);
+  border-color: var(--color-border);
+  color: var(--color-fg);
+}
+
+.button.secondary:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.button.ghost:hover:not(:disabled) {
+  background: var(--color-muted);
+  color: var(--color-fg);
+}
+
+/* ---- Header ---- */
+header {
+  background: var(--color-card);
+  border-bottom-color: var(--color-border);
+}
+
+.search {
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border);
+  transition: border-color var(--tr), color var(--tr);
+}
+
+.search:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ---- Inputs ---- */
+.content textarea,
+.content select,
+.auth-box input,
+.composer textarea {
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border);
+  transition: border-color var(--tr), box-shadow var(--tr);
+}
+
+.content textarea:focus,
+.content select:focus,
+.auth-box input:focus,
+.composer textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px #0d94881f;
+}
+
+/* ---- Reader surfaces ---- */
+.reader {
+  border-color: var(--color-border);
+}
+
+.pdf article {
+  border-color: var(--color-border);
+}
+
+.rail button {
+  border-color: var(--color-border);
+}
+
+.rail button.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow);
+}
+
+/* ---- Tabs align to primary ---- */
+.tabs button::after {
+  background: var(--color-primary);
+}
+
+.tabs button.selected {
+  color: var(--color-primary);
+}
+
+/* ---- Sidebar accents ---- */
+.brand b,
+.auth-brand b {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.upload-button {
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  transition: background var(--tr);
+}
+
+.upload-button:hover {
+  background: var(--color-accent-hover);
+}
+
+/* ---- Auth screen ---- */
+.auth-page {
+  background: linear-gradient(135deg, #e0f5f1, #f0fdfa);
+}
+
+.auth-box {
+  border-radius: var(--radius-lg);
+  border-color: var(--color-border);
+  box-shadow: 0 24px 70px -30px #13343a33;
+}
+
+.auth-switch {
+  color: var(--color-primary);
+  transition: color var(--tr);
+}
+
+.auth-switch:hover {
+  color: var(--color-primary-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .search,
+  .upload-button,
+  .auth-switch,
+  .content textarea,
+  .content select,
+  .auth-box input,
+  .composer textarea {
+    transition: none !important;
+  }
+}

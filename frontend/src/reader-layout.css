@@ -182,6 +182,179 @@
   line-height: 1.55;
 }
 
+/* ---- Modern reader refinements: spacing, sizing, motion ---- */
+:root {
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  --dur: .28s;
+  --shadow-card: 0 20px 50px -20px #1b343a33;
+  --shadow-soft: 0 10px 26px -14px #1b343a2b;
+}
+
+@keyframes reader-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes reader-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Reader shell — softer card, roomier feel */
+.reader {
+  grid-template-columns: 88px minmax(340px, 1.25fr) minmax(320px, .9fr);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  animation: reader-fade var(--dur) var(--ease);
+}
+
+/* Pages viewer — breathable, tappable thumbnails */
+.rail {
+  padding: 22px 16px;
+  gap: 14px;
+  background: linear-gradient(180deg, #f7faf8, #eef4f0);
+}
+
+.rail button {
+  height: 70px;
+  border-radius: 12px;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.rail button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+  border-color: #b7d3ce;
+  color: #24736e;
+}
+
+.rail button.selected {
+  outline: none;
+  border-color: #4b938a;
+  box-shadow: 0 0 0 2px #4b938a, var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.rail span {
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid #dde6e1;
+  background: linear-gradient(180deg, #eef3f0, #e2ebe6);
+}
+
+/* PDF viewer — generous margins and readable measure */
+.pdf {
+  padding: 30px 34px 26px;
+}
+
+.pdf .toolbar {
+  margin-bottom: 22px;
+}
+
+.pdf article {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: 46px 52px;
+  border: 1px solid #eef2ef;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  animation: reader-rise var(--dur) var(--ease);
+}
+
+.pdf .document-text {
+  max-height: none;
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.pdf .paginate {
+  margin-top: 26px;
+  justify-content: center;
+}
+
+/* Tools — animated tabs and content transitions */
+.tabs button {
+  position: relative;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.tabs button::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: #277b75;
+  transform: scaleX(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+.tabs button:hover {
+  background: #f2f7f5;
+}
+
+.tabs button.selected::after {
+  transform: scaleX(1);
+}
+
+.tools .content {
+  padding: 26px 24px;
+  animation: reader-rise var(--dur) var(--ease);
+}
+
+.tts {
+  margin-top: 22px;
+  padding: 15px 16px;
+  border-radius: 12px;
+}
+
+.tool-result,
+.question-card,
+.study-start {
+  animation: reader-rise var(--dur) var(--ease);
+}
+
+/* Buttons — subtle lift and press feedback */
+.button {
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease), border-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader,
+  .rail button,
+  .pdf article,
+  .tools .content,
+  .tool-result,
+  .question-card,
+  .study-start,
+  .button,
+  .tabs button,
+  .tabs button::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @media (max-width: 1100px) {
   .document-actions {
     max-width: 360px;
