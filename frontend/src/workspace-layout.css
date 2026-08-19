@@ -406,7 +406,29 @@ header {
 }
 
 .library-upload input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.library-upload:focus-within {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.library-upload-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .library-list {
@@ -928,9 +950,9 @@ header {
     display: none;
   }
 
-  .shell main,
-  .shell.nav-collapsed main {
-    width: 100%;
+  #app .shell > main,
+  #app .shell.nav-collapsed > main {
+    width: 100% !important;
     margin-left: 0 !important;
   }
 
@@ -940,12 +962,12 @@ header {
     padding: 22px 14px;
   }
 
-  .sidebar:not(.open) {
-    transform: translateX(-100%);
+  #app .sidebar:not(.open) {
+    transform: translateX(-100%) !important;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
+  #app .sidebar.open {
+    transform: translateX(0) !important;
   }
 
   .shell.nav-collapsed .brand > span,
