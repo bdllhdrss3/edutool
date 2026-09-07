@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright artifacts (screenshots, traces, reports)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

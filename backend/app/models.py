@@ -1,10 +1,13 @@
-from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database import Base
 
+
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 class User(Base):
     __tablename__ = "users"
@@ -15,10 +18,12 @@ class User(Base):
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = (Index("ix_documents_user_file_hash", "user_id", "file_hash", unique=True),)
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     filename: Mapped[str] = mapped_column(String(255))
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     page_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     pages: Mapped[list["DocumentPage"]] = relationship(cascade="all, delete-orphan")

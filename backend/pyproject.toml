@@ -8,12 +8,16 @@ dependencies = [
   "uvicorn[standard]>=0.30,<1.0",
   "pydantic-settings>=2.5,<3.0",
   "sqlalchemy>=2.0,<3.0",
+  "alembic>=1.13,<2.0",
   "psycopg[binary]>=3.2,<4.0",
   "pwdlib[argon2]>=0.2,<1.0",
   "pyjwt>=2.9,<3.0",
   "httpx>=0.27,<1.0",
   "python-multipart>=0.0.12,<1.0",
   "pypdf>=5.0,<6.0",
+  "pdfplumber>=0.11,<1.0",
+  "pypdfium2>=4.30,<5.0",
+  "rapidocr-onnxruntime>=1.4,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -25,3 +29,16 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Cookie"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]

@@ -75,7 +75,9 @@
 
 .tool-identity h2 {
   margin: 0;
-  font: 600 19px Fraunces, Georgia, serif;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
 }
 
 .tool-identity .eyebrow {
