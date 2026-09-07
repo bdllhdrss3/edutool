@@ -108,6 +108,7 @@ let sendRequest = 0;
 let toolRequest = 0;
 let historyRequest = 0;
 let overlayTrigger: HTMLElement | null = null;
+let toastDismissFocusTarget: HTMLElement | null = null;
 const currentText = computed(
   () =>
     document.value?.pages.find((item) => item.page_number === page.value)
@@ -509,6 +510,10 @@ async function confirmDelete() {
   } catch (e) {
     // Native modal dialogs consume pointer events. Close it so the floating toast stays actionable.
     deleteTarget.value = null;
+    toastDismissFocusTarget = menuTrigger?.isConnected ? menuTrigger : null;
+    if (toastDismissFocusTarget) {
+      toastDismissFocusTarget.focus({ preventScroll: true });
+    }
     showError(e);
   } finally {
     deleting.value = false;
@@ -654,6 +659,10 @@ function formatDocumentDate(value: string) {
 function dismissError() {
   errorToast.value = "";
   if (errorToastTimer) clearTimeout(errorToastTimer);
+  if (toastDismissFocusTarget?.isConnected) {
+    toastDismissFocusTarget.focus({ preventScroll: true });
+  }
+  toastDismissFocusTarget = null;
 }
 function dismissNotice() {
   noticeToast.value = '';
