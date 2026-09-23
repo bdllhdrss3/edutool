@@ -6,7 +6,7 @@ import { api, type QuizQuestion, type QuizResult } from '../api'
 const props = defineProps<{ documentId: number; pageCount: number; currentPage: number }>()
 const emit = defineEmits<{ openPage: [page: number]; error: [message: string] }>()
 const id = useId()
-const PAGE_LIMIT = 100
+const PAGE_LIMIT = 300
 const PAGE_WINDOW = 50
 const selectedPages = ref<number[]>([])
 const draftPages = ref<number[]>([])
@@ -111,7 +111,7 @@ watch(() => props.documentId, () => {
   closeDialogs()
   clearPractice()
   scopeChosen.value = false
-  selectedPages.value = readerPage.value > 0 ? [readerPage.value] : []
+  selectedPages.value = Array.from({ length: Math.min(totalPages.value, PAGE_LIMIT) }, (_, index) => index + 1)
   draftPages.value = []
 }, { immediate: true })
 
@@ -124,7 +124,7 @@ watch(readerPage, value => {
 // Accommodate a document whose page count arrives after its ID, without losing a selection.
 watch(totalPages, (count, previous) => {
   if (!previous && count && !selectedPages.value.length && !questions.value.length && !busy.value) {
-    selectedPages.value = [readerPage.value]
+    selectedPages.value = Array.from({ length: Math.min(count, PAGE_LIMIT) }, (_, index) => index + 1)
   }
 })
 
@@ -172,7 +172,7 @@ function selectRange() {
     return
   }
   if (end - start + 1 > PAGE_LIMIT) {
-    emit('error', 'Choose a range of at most 100 pages.')
+    emit('error', `Choose a range of at most ${PAGE_LIMIT} pages.`)
     return
   }
   draftPages.value = Array.from({ length: end - start + 1 }, (_, i) => start + i)
@@ -203,7 +203,7 @@ async function focusQuestion() {
 async function generate() {
   if (busy.value || disposed || !selectedPages.value.length) return
   if (selectedPages.value.length > PAGE_LIMIT || selectedPages.value.some(page => page < 1 || page > totalPages.value)) {
-    emit('error', 'Select between 1 and 100 valid source pages before starting.')
+    emit('error', `Select between 1 and ${PAGE_LIMIT} valid source pages before starting.`)
     return
   }
   const version = ++requestVersion

@@ -1,4 +1,5 @@
 import hashlib
+from io import BytesIO
 from unittest.mock import Mock
 
 import pytest
@@ -82,8 +83,8 @@ def test_individual_and_bulk_chat_delete(api):
 
 
 def test_dedup_same_bytes_not_filename_and_per_user(api, monkeypatch):
-    parser = Mock(return_value=["Extracted content"])
-    monkeypatch.setattr(main, "extract_pdf_pages", parser)
+    parser = Mock(return_value=(["Extracted content"], "en"))
+    monkeypatch.setattr(main, "extract_document_pages", parser)
     content = b"%PDF-identical bytes"
     first = api.client.post("/api/v1/documents", files={"file": ("first.pdf", content, "application/pdf")})
     assert first.status_code == 201
@@ -112,7 +113,7 @@ def test_legacy_backfill_canonical_duplicate_persisted(api, monkeypatch):
     main.document_path(missing.user_id, missing.id).unlink()
     other = api.document(owner=1, content=content)
     parser = Mock(side_effect=AssertionError("Duplicate must not be parsed"))
-    monkeypatch.setattr(main, "extract_pdf_pages", parser)
+    monkeypatch.setattr(main, "extract_document_pages", parser)
     result = api.client.post("/api/v1/documents", files={"file": ("renamed.pdf", content, "application/pdf")})
     assert result.status_code == 200
     assert result.json()["id"] == canonical.id
@@ -129,7 +130,7 @@ def test_existing_hashed_row_wins_over_legacy(api, monkeypatch):
     content = b"%PDF-known"
     legacy = api.document(content=content)
     canonical = api.document(content=content, file_hash=hashlib.sha256(content).hexdigest())
-    monkeypatch.setattr(main, "extract_pdf_pages", Mock(side_effect=AssertionError))
+    monkeypatch.setattr(main, "extract_document_pages", Mock(side_effect=AssertionError))
     result = api.client.post("/api/v1/documents", files={"file": ("new.pdf", content, "application/pdf")})
     assert result.json()["id"] == canonical.id
     assert legacy.file_hash is None
@@ -139,3 +140,32 @@ def test_upload_validation(api):
     assert api.client.post("/api/v1/documents", files={"file": ("bad.txt", b"x", "text/plain")}).status_code == 415
     assert api.client.post("/api/v1/documents", files={"file": ("bad.pdf", b"bad", "application/pdf")}).status_code == 422
     assert count(api, Document) == 0
+
+
+def test_docx_upload_extracts_text_and_reports_swahili(api):
+    from docx import Document as WordDocument
+
+    source = WordDocument()
+    source.add_paragraph("Hii ni hati ambayo inaeleza kwa nini maji ni muhimu katika maisha ya kila siku na kwa afya.")
+    output = BytesIO()
+    source.save(output)
+    result = api.client.post("/api/v1/documents", files={
+        "file": ("maji.docx", output.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+
+    assert result.status_code == 201
+    assert result.json()["language"] == "sw"
+    detail = api.client.get(f"/api/v1/documents/{result.json()['id']}").json()
+    assert detail["language"] == "sw"
+    assert "maji ni muhimu" in detail["pages"][0]["text"]
+
+
+def test_opening_legacy_document_backfills_non_english_language(api):
+    doc = api.document(texts=["هذا المستند يشرح كيف تنتقل الجسيمات من تركيز مرتفع إلى تركيز منخفض."])
+    assert doc.language == "en"
+
+    detail = api.client.get(f"/api/v1/documents/{doc.id}")
+
+    assert detail.status_code == 200
+    assert detail.json()["language"] == "ar"
+    api.db.refresh(doc)
+    assert doc.language == "ar"

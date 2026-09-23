@@ -22,7 +22,7 @@ def seed(connection):
 
 
 def verify(connection):
-    assert MigrationContext.configure(connection).get_current_revision() == "0002_document_hash"
+    assert MigrationContext.configure(connection).get_current_revision() == "0003_language_quiz_recovery"
     index = next(i for i in sa.inspect(connection).get_indexes("documents") if i["name"] == "ix_documents_user_file_hash")
     assert index["unique"]
     assert index["column_names"] == ["user_id", "file_hash"]
@@ -57,9 +57,9 @@ def test_unique_hash_allows_nulls_and_other_users(tmp_path):
     with engine.begin() as connection:
         migrate(connection)
         seed(connection)
-        connection.execute(sa.text("INSERT INTO users SELECT 2, 'other', password_hash, created_at FROM users WHERE id=1"))
+        connection.execute(sa.text("INSERT INTO users (id, username, password_hash, created_at) SELECT 2, 'other', password_hash, created_at FROM users WHERE id=1"))
         for identifier, user_id, digest in [(2, 1, None), (3, 1, "a" * 64), (4, 2, "a" * 64)]:
-            connection.execute(sa.text("INSERT INTO documents SELECT :id, :user, title, filename, page_count, created_at, :hash FROM documents WHERE id=1"),
+            connection.execute(sa.text("INSERT INTO documents (id, user_id, title, filename, page_count, created_at, file_hash) SELECT :id, :user, title, filename, page_count, created_at, :hash FROM documents WHERE id=1"),
                                {"id": identifier, "user": user_id, "hash": digest})
         with pytest.raises(IntegrityError), connection.begin_nested():
             connection.execute(sa.text("UPDATE documents SET file_hash = :hash WHERE id=1"), {"hash": "a" * 64})

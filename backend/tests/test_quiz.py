@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import func, select
 
-from app.models import Conversation, Message
+from app.models import Conversation, Message, QuizQuestionHistory
 
 
 def valid_quiz():
@@ -124,3 +124,22 @@ def test_selected_pages_all_survive_context_budget(api, monkeypatch):
     source = mock.call_args.args[1][1]["content"]
     assert "FIRST" in source and "SECOND" in source and "UNSELECTED" not in source
     assert len(source) < 1050
+
+
+def test_quiz_history_is_per_document_and_repeated_questions_are_repaired(api, monkeypatch):
+    doc = api.document()
+    doc.language = "sw"
+    api.db.commit()
+    first = valid_quiz()
+    fresh = copy.deepcopy(first)
+    for index, question in enumerate(fresh["questions"]):
+        question["question"] = f"{question['question']} Apply this in a new situation {index}."
+    first_mock = mock_provider(monkeypatch, [first])
+    assert api.client.post(f"/api/v1/documents/{doc.id}/quiz", json={"page_numbers": [1, 2]}).status_code == 200
+    assert "Swahili" in first_mock.call_args.args[1][0]["content"]
+    second_mock = mock_provider(monkeypatch, [first, fresh])
+    result = api.client.post(f"/api/v1/documents/{doc.id}/quiz", json={"page_numbers": [1, 2]})
+    assert result.status_code == 200
+    assert second_mock.await_count == 2
+    assert first["questions"][0]["question"] in second_mock.call_args.args[1][0]["content"]
+    assert api.db.scalar(select(func.count()).select_from(QuizQuestionHistory)) == 20

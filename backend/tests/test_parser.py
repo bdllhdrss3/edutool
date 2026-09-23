@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from pypdf import PdfWriter
 
 from app.core.config import Settings
+from app.services import document_parser
 from app.services import pdf_parser as parser
 
 
@@ -168,3 +169,38 @@ def test_real_scanned_pdf_ocr(settings):
         image.save(output, format="PDF", resolution=100)
     text = parser.extract_pdf_pages(output.getvalue())[0].upper()
     assert "DIFFUSION" in text and "GRADIENT" in text
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    ("Diffusion moves particles from high to low concentration.", "en"),
+    ("هذا المستند يشرح كيف تنتقل الجسيمات من تركيز مرتفع إلى تركيز منخفض.", "ar"),
+    ("Hii ni somo ambalo linaeleza kwa nini maji ni muhimu katika maisha ya kila siku.", "sw"),
+])
+def test_supported_language_detection(text, expected):
+    assert document_parser.detect_language(text) == expected
+
+
+def test_real_docx_extracts_paragraphs_and_tables():
+    from docx import Document
+
+    document = Document()
+    document.add_paragraph("Usafirishaji wa chembe katika seli")
+    table = document.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "Aina"
+    table.rows[0].cells[1].text = "Maelezo"
+    output = BytesIO()
+    document.save(output)
+
+    pages, language = document_parser.extract_document_pages(output.getvalue(), "biology.docx")
+
+    assert pages == ["Usafirishaji wa chembe katika seli\nAina | Maelezo"]
+    assert language == "en"
+
+
+@pytest.mark.parametrize(("filename", "content", "message"), [
+    ("notes.txt", b"notes", "PDF or DOCX"),
+    ("notes.docx", b"not a zip", "signature"),
+])
+def test_document_parser_rejects_unsupported_or_invalid_files(filename, content, message):
+    with pytest.raises(HTTPException, match=message):
+        document_parser.extract_document_pages(content, filename)

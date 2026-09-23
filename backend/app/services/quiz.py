@@ -3,9 +3,15 @@ import re
 from typing import Any
 
 
-def quiz_prompt(selected_pages: list[int]) -> str:
+def normalize_question(question: str) -> str:
+    return re.sub(r"\W+", " ", question).strip().casefold()
+
+
+def quiz_prompt(selected_pages: list[int], language: str = "English", previous_questions: list[str] | None = None) -> str:
+    history = "\n".join(f"- {question}" for question in (previous_questions or [])[-100:]) or "None"
     return f"""You design source-grounded learning assessments, not document scavenger hunts.
 Create exactly 10 distinct, challenging but fair multiple-choice questions from the supplied material.
+Write every question, option, and explanation in {language}, matching the language of the document.
 Test understanding of concepts, cause/effect, comparison, worked reasoning, application to a short scenario,
 and common misconceptions. Aim for 4 concept, 3 application, and 3 misconception questions where supported.
 Each question must be answerable from substantive source content without relying on outside facts.
@@ -21,7 +27,10 @@ Allowed source pages: {selected_pages}. Cite only a page supplied in the source 
 Return only JSON: {{"questions":[{{"question":"string","options":["a","b","c","d"],
 "correct_index":0,"explanation":"string","source_page":1}}]}}.
 Exactly four nonempty distinct options per question; correct_index must be an integer from 0 to 3.
-If the source lacks sufficient substantive content, do not invent facts or fall back to metadata trivia."""
+If the source lacks sufficient substantive content, do not invent facts or fall back to metadata trivia.
+Previously shown questions for this document are listed below. Do not repeat them or lightly paraphrase them.
+Test different concepts or use materially different reasoning. Previously shown questions:
+{history}"""
 
 
 _METADATA = re.compile(
@@ -38,10 +47,12 @@ _METADATA = re.compile(
 )
 
 
-def validate_quiz_content(quiz: Any, selected_pages: list[int]) -> None:
-    normalized = [re.sub(r"\W+", " ", item.question).strip().casefold() for item in quiz.questions]
+def validate_quiz_content(quiz: Any, selected_pages: list[int], previous_questions: set[str] | None = None) -> None:
+    normalized = [normalize_question(item.question) for item in quiz.questions]
     if len(set(normalized)) != 10:
         raise ValueError("Questions must be distinct; duplicate questions were returned")
+    if previous_questions and set(normalized) & previous_questions:
+        raise ValueError("Questions already shown for this document must be replaced with fresh questions")
     for item in quiz.questions:
         if item.source_page not in selected_pages:
             raise ValueError("Each source_page must belong to the supplied selected pages")

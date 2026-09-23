@@ -18,7 +18,7 @@ def verify_schema() -> None:
     """Startup is read-only; operators migrate explicitly before starting a worker."""
     with engine.connect() as connection:
         revision = MigrationContext.configure(connection).get_current_revision()
-    if revision != "0002_document_hash":
+    if revision != "0003_language_quiz_recovery":
         raise RuntimeError("Database migration required: run python -m alembic upgrade head in backend before starting the API")
 
 def get_db() -> Generator[Session, None, None]:

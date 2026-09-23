@@ -1,6 +1,6 @@
 # EduTool
 
-Vue/FastAPI study workspace with user-owned PDFs, cookie authentication, persistent document chat, summaries, translation, text-to-speech, and a stateless 10-question Check Me quiz.
+Vue/FastAPI study workspace with user-owned PDF/DOCX documents, cookie authentication and recovery codes, persistent document chat, language-aware summaries and text-to-speech, translation, and a 10-question Check Me quiz with per-document question history.
 
 ## Local setup (Python 3.11+)
 
@@ -42,12 +42,12 @@ Open http://localhost:5173. Local API: http://127.0.0.1:8001/api/v1. CORS permit
 
 ## Safe database upgrades
 
-Migrations are in [backend/alembic.ini](backend/alembic.ini) and [backend/alembic/versions/0001_baseline.py](backend/alembic/versions/0001_baseline.py), followed by [backend/alembic/versions/0002_document_hash.py](backend/alembic/versions/0002_document_hash.py).
+Migrations are in [backend/alembic.ini](backend/alembic.ini), from the baseline through `0003_language_quiz_recovery`.
 
 1. Back up the configured database **and uploads** before upgrading. Coordinate downtime for writes. For SQLite, use its backup API or copy the database only while writers are stopped; do not copy an active WAL database as a lone file. PostgreSQL needs a verified database backup.
 2. Install the updated backend dependencies in the interpreter that will run the API.
 3. Run `python -m alembic upgrade head` from the backend directory with the same `DATABASE_URL` as the API. Run one migrator before starting workers.
-4. Run `python -m alembic current`; expected revision is `0002_document_hash`.
+4. Run `python -m alembic current`; expected revision is `0003_language_quiz_recovery`.
 5. Start/restart the API under operator control. Startup checks the revision and does **not** silently create/alter schema.
 
 Fresh databases run both revisions. The baseline inspects/adopts a complete unversioned legacy schema in place; **no manual stamp is necessary**. Baseline-stamped databases also upgrade normally. Already-added `file_hash` columns and the expected unique index are adopted without resetting rows. Existing duplicate legacy rows remain intact; lazy upload-time backfill hashes only one canonical row per user/content and leaves other duplicates nullable.
@@ -60,9 +60,9 @@ All routes below have the `/api/v1` prefix and require an authenticated owner:
 
 | Endpoint | Behavior |
 | --- | --- |
-| `POST /documents` | PDF upload, maximum **25 MiB** (25 × 1024 × 1024 bytes). New content: 201 and `existing: false`. Identical bytes for the same user: 200 and the canonical document with `existing: true`, regardless of filename. |
-| `DELETE /documents/{id}` | Delete owned PDF, extracted pages, associated conversations/messages and its expected upload path. |
-| `DELETE /documents` | Clear owned PDFs and their associated chats/files; preserve other users and legacy unattached chats. |
+| `POST /documents` | PDF or DOCX upload, maximum **25 MiB** (25 × 1024 × 1024 bytes). New content: 201 and `existing: false`. Identical bytes for the same user: 200 and the canonical document with `existing: true`, regardless of filename. |
+| `DELETE /documents/{id}` | Delete an owned document, extracted pages, quiz history, associated conversations/messages and its expected upload path. |
+| `DELETE /documents` | Clear owned documents and their associated chats/files; preserve other users and legacy unattached chats. |
 | `DELETE /conversations/{id}` | Delete one owned conversation and its messages, not its PDF. |
 | `DELETE /conversations` | Clear every chat for the current user, including unattached legacy chats. |
 
@@ -80,6 +80,7 @@ Check the **actual listener** at `/openapi.json`, not just source files. It must
 - History includes only complete user/assistant pairs, ordered by timestamp and ID. Defaults: **12 messages / 16,000 characters**; configurable with `CHAT_HISTORY_MESSAGES` and `CHAT_HISTORY_CHARS`. These are character budgets, not tokenizer-exact token limits.
 - Structured classifications are `answerable`, `unrelated`, or `gibberish`. Rejected requests get deterministic refusal text and up to two suggested study questions. Invalid classifications or contradictory/empty answer contracts fail closed with 502 and save no turns.
 - `operation: "summary"` or `"translation"` on `/chat` uses only selected source context, receives no chat history, and creates no conversation/messages. Quiz generation is likewise non-persisting. Legacy utility messages are not automatically distinguishable and are not rewritten.
+- New uploads are classified as English, Arabic, or Swahili. Chat, summaries, refusals, quiz content, text direction, and browser speech language follow the document language. Translation follows its explicitly selected target language.
 - Document context is capped at `DOCUMENT_CONTEXT_LIMIT` (default 30,000 characters). Whole-document chat uses the beginning of the extracted text, not retrieval across arbitrarily long documents. Select a page for precise grounding.
 
 ### Check Me quiz
@@ -88,7 +89,11 @@ Check the **actual listener** at `/openapi.json`, not just source files. It must
 
 Questions should test concepts, application and misconceptions—not author names, document titles, publication data or page-location trivia. Prompt instructions and deterministic metadata-pattern checks enforce this; invalid JSON/shape, duplicates, invalid source pages and detected metadata trivia trigger **one complete repair**, then 502. A provider outage is not retried as a content repair. These checks do not prove semantic correctness, entailment or coverage, and metadata detection is English-oriented; review generated answers against the PDF.
 
-Select 1–100 pages; every selected page needs at least 80 extracted characters. Context is divided across the selected pages within `QUIZ_CONTEXT_LIMIT` (default 45,000 characters), rather than silently excluding later pages. Metadata-only or insufficient substantive material may not support 10 meaningful questions. Quiz attempts/answers are not stored server-side; scoring/reveal behavior is handled by the frontend.
+Select 1–300 pages; the frontend initially selects the whole document. Every selected page needs at least 80 extracted characters. Context is divided across the selected pages within `QUIZ_CONTEXT_LIMIT` (default 45,000 characters), rather than silently excluding later pages. Generated question text and source pages are stored per document and supplied to later generations to prevent exact repeats; answers and scores remain client-side.
+
+## Password recovery
+
+Registration returns a recovery code once and the signed-in workspace keeps it visible until dismissed. Store it outside the app. `POST /auth/reset-password` accepts username, recovery code, and a new password. Recovery codes are stored only as SHA-256 hashes and remain valid for future resets; deployment-level rate limiting is still required for an internet-facing service.
 
 ## PDF extraction and OCR limits
 

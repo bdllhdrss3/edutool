@@ -26,8 +26,9 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return response.status === 204 ? (undefined as T) : response.json()
 }
 
-export type User = { id: number; username: string }
-export type DocumentSummary = { id: number; title: string; filename: string; page_count: number; created_at: string }
+export type User = { id: number; username: string; has_recovery_code: boolean; recovery_code?: string }
+export type DocumentLanguage = 'en' | 'ar' | 'sw'
+export type DocumentSummary = { id: number; title: string; filename: string; page_count: number; language: DocumentLanguage; created_at: string }
 export type DocumentDetail = DocumentSummary & { pages: { page_number: number; text: string }[] }
 export type UploadResult = Pick<DocumentSummary, 'id' | 'title' | 'filename' | 'page_count'> & { existing: boolean }
 export type Conversation = { id: number; title: string; document_id: number | null; updated_at: string }

@@ -73,16 +73,17 @@ const messages = ref<Message[]>([]),
   navCollapsed = ref(false),
   thumbnailsOpen = ref(true),
   toolsOpen = ref(true),
-  language = ref("Luganda");
+  language = ref("English");
 const mobileSheet = ref<MobileSheet>(null);
 const pdfZoom = ref(100),
   toolsWidth = ref(440);
 const username = ref(""),
   password = ref(""),
-  authMode = ref<"login" | "register">("login"),
+  authMode = ref<"login" | "register" | "reset">("login"),
   busy = ref(false),
   prompt = ref(""),
   conversationId = ref<number | null>(null);
+const recoveryCode = ref(""), resetCode = ref("");
 const summaryPrompt = ref(""),
   summaryResult = ref(""),
   translationResult = ref(""),
@@ -114,6 +115,8 @@ const currentText = computed(
     document.value?.pages.find((item) => item.page_number === page.value)
       ?.text || "No extractable text was found on this page.",
 );
+    const documentDirection = computed(() => document.value?.language === "ar" ? "rtl" : "ltr");
+    const documentLanguageName = computed(() => ({ en: "English", ar: "Arabic", sw: "Swahili" })[document.value?.language ?? "en"]);
 const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase());
 const searchedDocuments = computed(() =>
   normalizedSearch.value
@@ -156,19 +159,48 @@ async function authenticate() {
   busy.value = true;
   dismissError();
   try {
-    user.value = await api(`/auth/${authMode.value}`, {
+    if (authMode.value === "reset") {
+      await api("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ username: username.value, recovery_code: resetCode.value, new_password: password.value }),
+      });
+      authMode.value = "login";
+      resetCode.value = "";
+      password.value = "";
+      showNotice("Password reset. Sign in with your new password.");
+      return;
+    }
+    const authenticated = await api<User>(`/auth/${authMode.value}`, {
       method: "POST",
       body: JSON.stringify({
         username: username.value,
         password: password.value,
       }),
     });
+    user.value = authenticated;
+    if (authenticated.recovery_code) recoveryCode.value = authenticated.recovery_code;
     await refreshHistory();
   } catch (e) {
     showError(e);
   } finally {
     busy.value = false;
   }
+}
+async function copyRecoveryCode() {
+  try {
+    await navigator.clipboard.writeText(recoveryCode.value);
+    showNotice("Recovery code copied.");
+  } catch { showError("Could not copy the code. Select it and copy it manually."); }
+}
+async function setupRecovery() {
+  if (!user.value || busy.value) return;
+  busy.value = true;
+  try {
+    const result = await api<{ recovery_code: string }>("/auth/recovery-code", { method: "POST" });
+    recoveryCode.value = result.recovery_code;
+    user.value.has_recovery_code = true;
+  } catch (error) { showError(error); }
+  finally { busy.value = false; }
 }
 async function logout() {
   if (busy.value || deleting.value) return;
@@ -272,7 +304,7 @@ async function upload(event: Event) {
     if (context === documentRequest) await openDocument(created.id);
     if (created.existing)
       showNotice(
-        "This PDF is already in your library, so the existing copy was opened.",
+        "This document is already in your library, so the existing copy was opened.",
       );
     input.value = "";
   } catch (e) {
@@ -288,7 +320,7 @@ async function openChat(id: number) {
   resetPageTools();
   try {
     const history = chats.value.find((item) => item.id === id);
-    if (!history?.document_id) throw new Error('This conversation has no source PDF. You can delete it from its chat menu.');
+    if (!history?.document_id) throw new Error('This conversation has no source document. You can delete it from its chat menu.');
     const [result, selected] = await Promise.all([
       api<{ id: number; title: string; messages: Message[] }>(`/conversations/${id}`),
       api<DocumentDetail>(`/documents/${history.document_id}`),
@@ -417,7 +449,7 @@ function requestDeleteHistory() {
 function requestClearLibrary() {
   deleteTarget.value = {
     kind: 'library', title: 'Clear your library?',
-    message: 'All PDFs and their related conversations will be permanently removed. This cannot be undone.',
+    message: 'All documents and their related conversations will be permanently removed. This cannot be undone.',
   };
 }
 async function openChatMenu(chat: Conversation, event: MouseEvent | KeyboardEvent) {
@@ -470,14 +502,14 @@ function deleteMenuConversation() {
   closeChatMenu();
   if (chat) deleteTarget.value = {
     kind: 'chat', id: chat.id, title: 'Delete this chat?',
-    message: `“${chat.title}” will be permanently removed. Your PDF will stay in your library.`,
+    message: `“${chat.title}” will be permanently removed. Your document will stay in your library.`,
   };
 }
 function requestDeleteDocument(item: DocumentSummary) {
   deleteTarget.value = {
     kind: "document",
     id: item.id,
-    title: "Delete this PDF?",
+    title: "Delete this document?",
     message: `${item.title} and its related chat history will be permanently removed.`,
   };
 }
@@ -504,7 +536,7 @@ async function confirmDelete() {
       documents.value = documents.value.filter(doc => doc.id !== target.id);
       chats.value = chats.value.filter(chat => chat.document_id !== target.id);
     }
-    showNotice(target.kind === 'history' ? 'Chat history cleared.' : target.kind === 'chat' ? 'Chat deleted.' : target.kind === 'library' ? 'Library cleared.' : 'PDF deleted.');
+    showNotice(target.kind === 'history' ? 'Chat history cleared.' : target.kind === 'chat' ? 'Chat deleted.' : target.kind === 'library' ? 'Library cleared.' : 'Document deleted.');
     deleteTarget.value = null;
     await refreshHistory();
   } catch (e) {
@@ -526,6 +558,11 @@ function speak() {
     return;
   }
   const utterance = new SpeechSynthesisUtterance(currentText.value);
+  const speechLanguages = { en: "en-US", ar: "ar-SA", sw: "sw-KE" } as const;
+  utterance.lang = speechLanguages[document.value?.language ?? "en"];
+  utterance.voice = speechSynthesis.getVoices().find(voice =>
+    voice.lang.toLowerCase().startsWith(utterance.lang.slice(0, 2).toLowerCase()),
+  ) ?? null;
   utterance.onend = () => {
     reading.value = false;
     if (document.value && page.value < document.value.page_count) {
@@ -743,7 +780,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="eyebrow">YOUR STUDY WORKSPACE</p>
         <h1>
-          {{ authMode === "login" ? "Welcome back" : "Create your account" }}
+          {{ authMode === "login" ? "Welcome back" : authMode === "register" ? "Create your account" : "Reset your password" }}
         </h1>
         <label
           >Username<input
@@ -752,30 +789,32 @@ onBeforeUnmount(() => {
             minlength="3"
             autocomplete="username" /></label
         ><label
-          >Password<input
+          >{{ authMode === "reset" ? "New password" : "Password" }}<input
             v-model="password"
             required
             minlength="8"
             type="password"
-            autocomplete="current-password"
+            :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'"
         /></label>
+          <label v-if="authMode === 'reset'">Recovery code<input v-model="resetCode" required minlength="12" autocomplete="off" /></label>
         <button class="button primary auth-submit" :disabled="busy">
           {{
             busy
               ? "Please wait…"
               : authMode === "login"
                 ? "Sign in"
-                : "Register"
+                : authMode === "register" ? "Register" : "Reset password"
           }}</button
-        ><button
+        ><button v-if="authMode === 'login'" type="button" class="auth-switch" @click="authMode = 'reset'">Forgot password?</button>
+        <button
           type="button"
           class="auth-switch"
-          @click="authMode = authMode === 'login' ? 'register' : 'login'"
+          @click="authMode = authMode === 'register' ? 'login' : authMode === 'reset' ? 'login' : 'register'"
         >
           {{
             authMode === "login"
               ? "New here? Create an account"
-              : "Already registered? Sign in"
+              : authMode === "register" ? "Already registered? Sign in" : "Back to sign in"
           }}
         </button>
       </form>
@@ -785,6 +824,11 @@ onBeforeUnmount(() => {
       class="shell"
       :class="{ 'nav-collapsed': navCollapsed, 'document-open': document }"
     >
+      <aside v-if="recoveryCode" class="recovery-banner" aria-live="polite">
+        <div><strong>Save your recovery code</strong><code>{{ recoveryCode }}</code></div>
+        <button type="button" class="button" @click="copyRecoveryCode">Copy</button>
+        <button type="button" class="close" aria-label="Dismiss recovery code" @click="recoveryCode = ''"><X :size="18" /></button>
+      </aside>
       <aside
         class="sidebar"
         :class="{ open: sidebar }"
@@ -803,11 +847,11 @@ onBeforeUnmount(() => {
         </div>
         <label class="upload-button"
           ><Upload :size="17" /><span>{{
-            busy ? "Processing…" : "Upload PDF"
+            busy ? "Processing…" : "Upload document"
           }}</span
           ><input
             type="file"
-            accept="application/pdf"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             :disabled="busy"
             @change="upload"
         /></label>
@@ -828,7 +872,7 @@ onBeforeUnmount(() => {
             >
           </button>
           <p v-if="!documents.length" class="empty-nav">
-            Upload your first PDF
+            Upload your first document
           </p>
           <div class="nav-title history-title">
             <History :size="14" /><span>CHAT HISTORY</span>
@@ -860,6 +904,9 @@ onBeforeUnmount(() => {
           <p v-if="!chats.length" class="empty-nav">No conversations yet</p>
         </nav>
         <nav class="bottom">
+          <button v-if="!user.has_recovery_code" title="Set up password recovery" @click="setupRecovery">
+            <RotateCcw :size="17" /><span>Set up password recovery</span>
+          </button>
           <button title="Sign out" @click="logout">
             <LogOut :size="17" /><span>Sign out</span>
           </button>
@@ -938,7 +985,7 @@ onBeforeUnmount(() => {
                 ref="searchInput"
                 v-model="searchQuery"
                 aria-label="Search documents, chats, and page text"
-                placeholder="Search documents, chats, and this PDF…"
+                placeholder="Search documents, chats, and this document…"
               /><button aria-label="Close search" @click="closeSearch">
                 <X :size="18" />
               </button>
@@ -1028,19 +1075,19 @@ onBeforeUnmount(() => {
               :aria-busy="busy"
               :aria-disabled="busy"
               ><Upload :size="17" aria-hidden="true" />
-              {{ documents.length ? "Upload PDF" : "Upload your first PDF"
+              {{ documents.length ? "Upload document" : "Upload your first document"
               }}<span
                 class="library-upload-status"
                 role="status"
                 aria-live="polite"
                 >{{
                   busy
-                    ? "Uploading PDF. Upload is temporarily unavailable."
+                    ? "Uploading document. Upload is temporarily unavailable."
                     : ""
                 }}</span
               ><input
                 type="file"
-                accept="application/pdf"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 :disabled="busy"
                 @change="upload"
             /></label>
@@ -1072,7 +1119,7 @@ onBeforeUnmount(() => {
                 <button
                   class="library-delete"
                   :aria-label="`Delete ${item.title}`"
-                  title="Delete PDF"
+                  title="Delete document"
                   @click="requestDeleteDocument(item)"
                 >
                   <Trash2 :size="17" /><span>Delete</span>
@@ -1082,14 +1129,14 @@ onBeforeUnmount(() => {
           </div>
           <div v-else class="library-empty">
             <LibraryBig :size="32" aria-hidden="true" />
-            <h2>No PDFs yet</h2>
-            <p>Upload a PDF to start reading and studying.</p>
+            <h2>No documents yet</h2>
+            <p>Upload a PDF or Word document to start reading and studying.</p>
           </div>
         </section>
         <template v-else
           ><section class="title">
             <div>
-              <p class="eyebrow"><FileText :size="14" /> PDF DOCUMENT</p>
+              <p class="eyebrow"><FileText :size="14" /> {{ document.filename.toLowerCase().endsWith('.docx') ? 'WORD DOCUMENT' : 'PDF DOCUMENT' }}</p>
               <h1>{{ document.title }}</h1>
               <small
                 >{{ document.page_count }} pages · Page {{ page }} open</small
@@ -1099,10 +1146,10 @@ onBeforeUnmount(() => {
               <button class="button ghost" @click="closeDocument">
                 <ArrowLeft :size="16" /> Library</button
               ><label class="button secondary"
-                ><Plus :size="16" /> New PDF<input
+                ><Plus :size="16" /> New document<input
                   class="hidden-input"
                   type="file"
-                  accept="application/pdf"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   @change="upload" /></label
               ><button
                 class="button study-button"
@@ -1318,13 +1365,13 @@ onBeforeUnmount(() => {
                     />
                   </button>
                 </div>
-                <p class="body">{{ currentText }}</p>
+                <p class="body" :dir="documentDirection" :lang="document.language">{{ currentText }}</p>
                 <div class="tts">
                   <Volume2 :size="19" /><span
                     ><strong>{{
                       reading ? "Reading this document" : "Listen to this page"
                     }}</strong
-                    ><small>Continues page by page automatically</small></span
+                    ><small>Uses {{ documentLanguageName }} and continues page by page</small></span
                   >
                 </div>
               </div>
@@ -1355,7 +1402,7 @@ onBeforeUnmount(() => {
                 </button>
                 <div v-if="summaryResult" class="tool-result summary-result">
                   <p class="result-label">PAGE {{ page }} SUMMARY</p>
-                  <p>{{ summaryResult }}</p>
+                  <p :dir="documentDirection" :lang="document.language">{{ summaryResult }}</p>
                 </div>
               </div>
               <div
@@ -1375,6 +1422,7 @@ onBeforeUnmount(() => {
                 </p>
                 <label for="translation-language">Target language</label
                 ><select id="translation-language" v-model="language">
+                  <option>English</option>
                   <option>Luganda</option>
                   <option>Arabic</option>
                   <option>French</option>
@@ -1422,6 +1470,8 @@ onBeforeUnmount(() => {
                     v-for="(message, index) in messages"
                     :key="index"
                     :class="['message', message.role]"
+                    :dir="message.role === 'assistant' ? documentDirection : 'auto'"
+                    :lang="message.role === 'assistant' ? document.language : undefined"
                   >
                     {{ message.content }}
                   </div>
@@ -1539,7 +1589,7 @@ onBeforeUnmount(() => {
       v-if="deleteTarget"
       :title="deleteTarget.title"
       :message="deleteTarget.message"
-      :confirm-label="deleteTarget.kind === 'history' ? 'Clear history' : deleteTarget.kind === 'library' ? 'Clear library' : deleteTarget.kind === 'chat' ? 'Delete chat' : 'Delete PDF'"
+      :confirm-label="deleteTarget.kind === 'history' ? 'Clear history' : deleteTarget.kind === 'library' ? 'Clear library' : deleteTarget.kind === 'chat' ? 'Delete chat' : 'Delete document'"
       :busy="deleting"
       @cancel="!deleting && (deleteTarget = null)"
       @confirm="confirmDelete"
