@@ -19,6 +19,8 @@ services:
     ports:
       - "8010:8000"
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://edutool:${POSTGRES_PASSWORD:-change-me}@postgres:5432/edutool
     volumes:
       - ./backend:/app
     healthcheck:
@@ -36,8 +38,8 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-edutool}
-      POSTGRES_USER: ${POSTGRES_USER:-edutool}
+      POSTGRES_DB: edutool
+      POSTGRES_USER: edutool
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
       - "5432:5432"
