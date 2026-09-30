@@ -1,0 +1,10 @@
+# Local development only; Coolify deploys with -f docker-compose.yml and skips this file.
+services:
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  backend:
+    volumes:
+      - ./backend:/app

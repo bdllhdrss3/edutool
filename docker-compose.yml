@@ -6,9 +6,6 @@ services:
       - "8080:5173"
     environment:
       VITE_API_URL: http://localhost:8010/api/v1
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       backend:
         condition: service_healthy
@@ -21,8 +18,6 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://edutool:${POSTGRES_PASSWORD:-change-me}@postgres:5432/edutool
-    volumes:
-      - ./backend:/app
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
