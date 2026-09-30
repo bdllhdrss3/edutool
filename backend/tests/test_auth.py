@@ -25,3 +25,16 @@ def test_existing_authenticated_user_can_enroll_in_recovery(api):
     assert enrollment.status_code == 200
     assert len(enrollment.json()["recovery_code"]) >= 12
     assert api.client.get("/api/v1/auth/me").json()["has_recovery_code"] is True
+
+
+def test_docker_frontend_origin_is_allowed_to_preflight_registration(api):
+    response = api.client.options(
+        "/api/v1/auth/register",
+        headers={
+            "Origin": "http://localhost:8080",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:8080"
