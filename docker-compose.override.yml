@@ -1,10 +1,22 @@
 # Local development only; Coolify deploys with -f docker-compose.yml and skips this file.
 services:
   frontend:
+    ports:
+      - "8080:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
 
   backend:
+    ports:
+      - "8010:8000"
     volumes:
       - ./backend:/app
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"

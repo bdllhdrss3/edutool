@@ -2,10 +2,8 @@ services:
   frontend:
     build:
       context: ./frontend
-    ports:
-      - "8080:5173"
     environment:
-      VITE_API_URL: http://localhost:8010/api/v1
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8010/api/v1}
     depends_on:
       backend:
         condition: service_healthy
@@ -13,8 +11,6 @@ services:
   backend:
     build:
       context: ./backend
-    ports:
-      - "8010:8000"
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://edutool:${POSTGRES_PASSWORD:-change-me}@postgres:5432/edutool
@@ -36,8 +32,6 @@ services:
       POSTGRES_DB: edutool
       POSTGRES_USER: edutool
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -48,8 +42,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
